@@ -37,6 +37,7 @@ while cap.isOpened():
         if not is_sleeping:
             is_sleeping = True
             sleep_start_time = datetime.now()
+        if (datetime.now() - sleep_start_time).total_seconds() >= 3:
             timestamp_str = sleep_start_time.strftime('%Y-%m-%d_%H-%M-%S')
             photo_name = f"sleep_proofs/sleep_start_{timestamp_str}.jpg"
             frame_to_save = cv2.cvtColor(results.render()[0], cv2.COLOR_RGB2BGR)
