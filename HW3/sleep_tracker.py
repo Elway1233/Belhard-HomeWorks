@@ -1,7 +1,7 @@
 import cv2
-import os
 import torch
 from datetime import datetime, timedelta
+import time
 
 MODEL_PATH = 'runs/train/exp4/weights/best.pt'
 #VIDEO_SOURCE = 0
@@ -37,12 +37,22 @@ while cap.isOpened():
         if not is_sleeping:
             is_sleeping = True
             sleep_start_time = datetime.now()
-        if (datetime.now() - sleep_start_time).total_seconds() >= 3:
-            timestamp_str = sleep_start_time.strftime('%Y-%m-%d_%H-%M-%S')
-            photo_name = f"sleep_proofs/sleep_start_{timestamp_str}.jpg"
-            frame_to_save = cv2.cvtColor(results.render()[0], cv2.COLOR_RGB2BGR)
-            cv2.imwrite(photo_name, frame_to_save)
-            print(f"[{sleep_start_time.strftime('%H:%M:%S')}] Сон начался. Фото сохранено: {photo_name}")
+            print(f"[{sleep_start_time.strftime('%H:%M:%S')}] Сон начался")
+
+        current_sleep_duration = (datetime.now() - sleep_start_time).total_seconds()
+
+        if current_sleep_duration >= 3:
+            seconds_passed = int(current_sleep_duration)
+
+            if seconds_passed % 5 == 0:
+                timestamp_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                photo_name = f"sleep_proofs/sleep_{timestamp_str}.jpg"
+
+                frame_to_save = cv2.cvtColor(results.render()[0], cv2.COLOR_RGB2BGR)
+                cv2.imwrite(photo_name, frame_to_save)
+
+                print(f"Сон продолжается ({int(current_sleep_duration)} сек). Фото сохранено.")
+                time.sleep(0.5)
     else:
         if is_sleeping:
             is_sleeping = False
@@ -78,7 +88,9 @@ if is_sleeping:
 total_sleep_seconds = sum([event['duration'] for event in sleep_events])
 
 if len(sleep_events) > 0:
-    report_filename = f"sleep_report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+
+    first_sleep_time = sleep_events[0]['start'].strftime('%Y-%m-%d_%H-%M-%S')
+    report_filename = f"sleep_report_{first_sleep_time}.txt"
 
     with open(report_filename, 'w', encoding='utf-8') as f:
         f.write("ОТЧЕТ О СНЕ\n\n")
