@@ -16,7 +16,7 @@ logging.basicConfig(
     encoding='utf-8'
 )
 
-TOKEN = '8619535683:AAH14IL8WRyS1MTgbbhPY4CrS4PBIy3iBLM'
+TOKEN = 'Your token'
 bot = telebot.TeleBot(TOKEN)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
