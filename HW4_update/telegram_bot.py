@@ -9,14 +9,16 @@ import datetime
 from model import NeuralNet, DeepNeuralNet
 from nltk_utils import bag_of_words, tokenize
 
-logging.basicConfig(
-    filename='telegram_chat.log',
-    level=logging.INFO,
-    format='%(asctime)s | %(message)s',
-    encoding='utf-8'
-)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler('telegram_chat.log', encoding='utf-8')
+formatter = logging.Formatter('%(asctime)s | %(message)s')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
-TOKEN = 'Your token'
+
+
+TOKEN = '8619535683:AAH14IL8WRyS1MTgbbhPY4CrS4PBIy3iBLM'
 bot = telebot.TeleBot(TOKEN)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -187,6 +189,14 @@ def handle_message(message):
     else:
         u_data['state'] = None
         bot.send_message(chat_id, "Извините, я не понимаю... Воспользуйтесь кнопками.", reply_markup=get_main_menu())
+
+    logging.info(
+        f"Chat: {chat_id} | "
+        f"In: '{text}' | "
+        f"Tag: {tag} | "
+        f"Conf: {confidence:.2f} | "
+        f"Out: '{response}'"
+    )
 
 
 if __name__ == '__main__':
