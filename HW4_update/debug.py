@@ -2,10 +2,10 @@ import telebot
 import torch
 import json
 import random
-from model import NeuralNet, DeepNeuralNet
+from model import  DeepNeuralNet
 from nltk_utils import bag_of_words, tokenize
 
-TOKEN = 'Your token'
+TOKEN = 'Your Token'
 bot = telebot.TeleBot(TOKEN)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 with open('intents.json', 'r', encoding='utf-8') as json_data:
