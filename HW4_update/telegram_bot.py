@@ -158,7 +158,7 @@ def handle_message(message):
     probs = torch.softmax(output, dim=1)
     confidence = probs[0][predicted.item()].item()
 
-    if confidence > 0.65:
+    if confidence > 0.85:
 
         if tag == 'view_cart':
             cart = u_data['cart']
