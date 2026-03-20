@@ -19,8 +19,8 @@ logging.basicConfig(
 )
 
 parser = argparse.ArgumentParser(description="Train Chatbot Neural Network")
-parser.add_argument('--model', type=str, default='basic', choices=['basic', 'deep', 'dropout'],
-                    help='Выберите тип нейросети: basic, deep, dropout')
+parser.add_argument('--model', type=str, default='basic', choices=['basic', 'deep'],
+                    help='Выберите тип нейросети: basic, deep')
 args = parser.parse_args()
 
 with open('intents.json', 'r', encoding='utf-8') as f:
