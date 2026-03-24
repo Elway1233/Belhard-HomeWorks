@@ -18,7 +18,7 @@ logger.addHandler(file_handler)
 
 
 
-TOKEN = 'Your token'
+TOKEN = '8619535683:AAH14IL8WRyS1MTgbbhPY4CrS4PBIy3iBLM'
 bot = telebot.TeleBot(TOKEN)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -146,50 +146,96 @@ def handle_message(message):
         bot.send_message(chat_id, "Вы вернулись в главное меню.", reply_markup=get_main_menu())
         return
 
-    sentence_tokenized = tokenize(text)
-    X = bag_of_words(sentence_tokenized, all_words)
-    X = X.reshape(1, X.shape[0])
-    X = torch.from_numpy(X).to(device)
+    exact_match_tags = {
+        "Ассортимент 💐": "assortment",
+        "Корзина 🛒": "view_cart",
+        "Доставка 🚚": "delivery",
+        "Как оплатить? 💳": "payment",
+        "Связаться с человеком 👨‍💻": "contact_admin",
+        "Весна 🌷": "season_spring",
+        "Лето 🌻": "season_summer",
+        "Осень 🍁": "season_autumn",
+        "Зима ❄️": "season_winter"
+    }
 
-    output = model(X)
-    _, predicted = torch.max(output, dim=1)
-    tag = tags[predicted.item()]
+    tag = None
+    confidence = 1.0
+    response = "Неизвестная ошибка"
 
-    probs = torch.softmax(output, dim=1)
-    confidence = probs[0][predicted.item()].item()
+    if text in exact_match_tags:
+        tag = exact_match_tags[text]
+    else:
+        sentence_tokenized = tokenize(text)
+        X = bag_of_words(sentence_tokenized, all_words)
+        X = X.reshape(1, X.shape[0])
+        X = torch.from_numpy(X).to(device)
+
+        output = model(X)
+        _, predicted = torch.max(output, dim=1)
+        tag = tags[predicted.item()]
+
+        probs = torch.softmax(output, dim=1)
+        confidence = probs[0][predicted.item()].item()
 
     if confidence > 0.85:
-
         if tag == 'view_cart':
             cart = u_data['cart']
             if not cart:
-                bot.send_message(chat_id, "Ваша корзина пуста 😔. Посмотрите наш ассортимент!")
+                response = "Ваша корзина пуста 😔. Посмотрите наш ассортимент!"
+                bot.send_message(chat_id, response)
             else:
                 cart_text = "🛒 **Ваш заказ:**\n\n"
                 for item, count in cart.items():
                     cart_text += f"🔸 {item}: {count} букет(ов)\n"
+                response = "Отображена корзина"
                 bot.send_message(chat_id, cart_text, parse_mode="Markdown", reply_markup=get_cart_keyboard())
+
             u_data['state'] = None
-            return
 
-        for intent in intents['intents']:
-            if tag == intent["tag"]:
-                response = random.choice(intent['responses'])
-                if tag == 'assortment':
-                    u_data['state'] = 'waiting_for_season_answer'
-                else:
-                    u_data['state'] = None
-                break
-
-        if tag in ['season_spring', 'season_summer', 'season_autumn', 'season_winter']:
-            bot.send_message(chat_id, response, reply_markup=get_main_menu())
         else:
-            bot.send_message(chat_id, response)
+            # Ищем ответ в intents.json
+            for intent in intents['intents']:
+                if tag == intent["tag"]:
+                    response = random.choice(intent['responses'])
+                    if tag == 'assortment':
+                        u_data['state'] = 'waiting_for_season_answer'
+                        # Если запросили ассортимент, показываем клавиатуру сезонов
+                        bot.send_message(chat_id, response, reply_markup=get_seasons_menu())
+                    else:
+                        u_data['state'] = None
 
+                        # Если это был выбор сезона, выводим товары!
+                        if tag in ['season_spring', 'season_summer', 'season_autumn', 'season_winter']:
+                            bot.send_message(chat_id, response, reply_markup=get_main_menu())
+                            # 2. Выводим конкретные товары с кнопками "Добавить в корзину"
+                            if tag == 'season_spring':
+                                bot.send_message(chat_id, "🌷 Тюльпаны - 7 руб.",
+                                                 reply_markup=get_buy_keyboard('tulip', 'Тюльпаны'))
+                                bot.send_message(chat_id, "🌸 Пионы - 25 руб.",
+                                                 reply_markup=get_buy_keyboard('peony', 'Пионы'))
+                            elif tag == 'season_summer':
+                                bot.send_message(chat_id, "🌷 Тюльпаны - 3 руб.",
+                                                 reply_markup=get_buy_keyboard('tulip', 'Тюльпаны'))
+                                bot.send_message(chat_id, "🌸 Пионы - 15 руб.",
+                                                 reply_markup=get_buy_keyboard('peony', 'Пионы'))
+                            elif tag == 'season_autumn':
+                                bot.send_message(chat_id, "🌸 Пионы - 45 руб.",
+                                                 reply_markup=get_buy_keyboard('peony', 'Пионы'))
+                                bot.send_message(chat_id, "🌹 Красные розы - 25 руб.",
+                                                 reply_markup=get_buy_keyboard('rose', 'Розы'))
+
+                            elif tag == 'season_winter':
+                                bot.send_message(chat_id, "🌹 Красные розы - 30 руб.",
+                                                 reply_markup=get_buy_keyboard('rose', 'Розы'))
+                        else:
+                            bot.send_message(chat_id, response)
+                    break
     else:
         u_data['state'] = None
-        bot.send_message(chat_id, "Извините, я не понимаю... Воспользуйтесь кнопками.", reply_markup=get_main_menu())
+        response = "Извините, я не понимаю... Воспользуйтесь кнопками."
+        bot.send_message(chat_id, response, reply_markup=get_main_menu())
 
+    # Логгер теперь не будет выдавать ошибку UnboundLocalError
     logging.info(
         f"Chat: {chat_id} | "
         f"In: '{text}' | "
