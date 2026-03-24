@@ -1,136 +1,149 @@
+import math
+import seaborn as sns
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-try:
-    df = pd.read_csv('Sample - Superstore.csv', encoding='ISO-8859-1')
-except:
-    df = pd.read_csv('Sample - Superstore.csv', encoding='windows-1252')
+#1
+print("Загрузка данных...")
+df = pd.read_csv('SuperMarketAnalysis.csv')
 
-df = df.dropna(subset=['Sales', 'Quantity', 'Discount', 'Product ID'])
-q_limit = df['Sales'].quantile(0.99)
-df = df[df['Sales'] < q_limit]
+df['Date'] = pd.to_datetime(df['Date'], format='mixed')
+df['DayOfWeek'] = df['Date'].dt.dayofweek
+df['Time'] = df['Time'].astype(str).str.split(':').str[0].astype(int)
 
-df['Order Date'] = pd.to_datetime(df['Order Date'], dayfirst=True, format='mixed')
-df['Order Month'] = df['Order Date'].dt.month
-df['Order Year'] = df['Order Date'].dt.year
-df['Sales_Log'] = np.log1p(df['Sales'])
+columns_to_drop = [
+    'Invoice ID', 'Quantity', 'Tax 5%', 'cogs',
+    'gross margin percentage', 'gross income', 'Rating',
+    'Date', 'Time'
+]
 
-train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
+existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
+df_clean = df.drop(columns=existing_columns_to_drop)
 
-product_means = train_df.groupby('Product ID')['Sales_Log'].mean()
+#2
+target_col = 'Sales'
+y = df_clean[target_col]
+X = df_clean.drop(columns=[target_col])
 
-train_df['Prod_Avg_Sales'] = train_df['Product ID'].map(product_means)
-test_df['Prod_Avg_Sales'] = test_df['Product ID'].map(product_means)
+numeric_features = X.select_dtypes(include=['int64', 'float64', 'int32']).columns.tolist()
+categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
 
-global_mean = train_df['Sales_Log'].mean()
-train_df['Prod_Avg_Sales'] = train_df['Prod_Avg_Sales'].fillna(global_mean)
-test_df['Prod_Avg_Sales'] = test_df['Prod_Avg_Sales'].fillna(global_mean)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-categorical_features = ['Ship Mode', 'Segment', 'Region', 'Category', 'Sub-Category']
-numeric_features = ['Quantity', 'Discount', 'Order Month', 'Order Year', 'Prod_Avg_Sales']
-
-X_train = train_df[categorical_features + numeric_features]
-y_train = train_df['Sales_Log']
-X_test = test_df[categorical_features + numeric_features]
-y_test = test_df['Sales_Log']
+scaler = StandardScaler()
+categorical = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
 
 preprocessor = ColumnTransformer(
     transformers=[
-        ('num', StandardScaler(), numeric_features),
-        ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
+        ('num', scaler, numeric_features),
+        ('cat', categorical, categorical_features)
     ])
 
-model = Pipeline(steps=[
+model_pipeline = Pipeline(steps=[
     ('preprocessor', preprocessor),
-    ('regressor', GradientBoostingRegressor(
-        n_estimators=300,
-        learning_rate=0.1,
-        max_depth=5,
+    ('regressor', RandomForestRegressor(
+        n_estimators=200,
+        max_depth=6,
+        min_samples_leaf=10,
         random_state=42
     ))
 ])
 
-print("Обучение")
-model.fit(X_train, y_train)
+# 3.Обучение и оценка
+print("Обучение модели (Random Forest)...")
+model_pipeline.fit(X_train, y_train)
 
-y_pred_log = model.predict(X_test)
-y_pred = np.expm1(y_pred_log)
-y_test_real = np.expm1(y_test)
+y_train_pred = model_pipeline.predict(X_train)
+y_test_pred = model_pipeline.predict(X_test)
 
-mae = mean_absolute_error(y_test_real, y_pred)
-rmse = np.sqrt(mean_squared_error(y_test_real, y_pred))
-r2 = r2_score(y_test_real, y_pred)
+mae_train = mean_absolute_error(y_train, y_train_pred)
+mse_train = mean_squared_error(y_train, y_train_pred)
+rmse_train = np.sqrt(mse_train)
+r2_train = r2_score(y_train, y_train_pred)
 
-print(f"\nМетрики")
-print(f"MAE: {mae:.2f}")
-print(f"RMSE: {rmse:.2f}")
-print(f"R²: {r2:.4f}")
+mae_test = mean_absolute_error(y_test, y_test_pred)
+mse_test = mean_squared_error(y_test, y_test_pred)
+rmse_test = np.sqrt(mse_test)
+r2_test = r2_score(y_test, y_test_pred)
 
-plt.figure(figsize=(8, 8))
-plt.scatter(y_test_real, y_pred, alpha=0.3, color='darkblue')
-plt.plot([0, 1000], [0, 1000], 'r--')
-plt.xlabel("Реальные продажи")
-plt.ylabel("Предсказанные продажи")
-plt.title("Градиентный бустинг(факт vs прогноз")
-plt.show()
+print("\nСравнение метрик: Обучение vs Тест")
+print(f"Обучающая выборка (Train) -> R²: {r2_train:.3f} | MAE: {mae_train:.2f}| MSE: {mse_train:.2f} | RMSE: {rmse_train:.2f}")
+print(f"Тестовая выборка  (Test)  -> R²: {r2_test:.3f} | MAE: {mae_test:.2f} | MSE: {mse_test:.2f}| RMSE: {rmse_test:.2f}")
 
-residuals = y_test_real - y_pred
+# 4.Визуализация
+fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+fig.suptitle('Сравнение работы модели: Обучающая выборка vs Тестовая выборка', fontsize=16)
 
-plt.figure(figsize=(10, 5))
-sns.histplot(residuals, kde=True, color='purple', bins=50)
-plt.axvline(x=0, color='red', linestyle='--')
-plt.title("Распределение ошибок (Остатков)")
-plt.xlabel("Величина ошибки ($)")
-plt.ylabel("Количество заказов")
-plt.grid(True, alpha=0.3)
-plt.show()
+# График 1
+axes[0, 0].scatter(y_train, y_train_pred, alpha=0.5, color='blue', edgecolor='k')
+min_val_tr = min(y_train.min(), y_train_pred.min())
+max_val_tr = max(y_train.max(), y_train_pred.max())
+axes[0, 0].plot([min_val_tr, max_val_tr], [min_val_tr, max_val_tr], 'r--', lw=2)
+axes[0, 0].set_title('Фактические vs Предсказанные значения обучающей модели')
+axes[0, 0].set_xlabel('Реальные продажи (Факт)')
+axes[0, 0].set_ylabel('Предсказания модели')
+axes[0, 0].grid(True, linestyle='--', alpha=0.6)
 
-bins = [0, 50, 100, 200, 500, 1000, np.inf]
-labels = ['0-50', '50-100', '100-200', '200-500', '500-1000', '1000+']
+# График 2
+axes[0, 1].scatter(y_test, y_test_pred, alpha=0.5, color='green', edgecolor='k')
+min_val_te = min(y_test.min(), y_test_pred.min())
+max_val_te = max(y_test.max(), y_test_pred.max())
+axes[0, 1].plot([min_val_te, max_val_te], [min_val_te, max_val_te], 'r--', lw=2)
+axes[0, 1].set_title('Фактические vs Предсказанные значения тестовой модели')
+axes[0, 1].set_xlabel('Реальные продажи (Факт)')
+axes[0, 1].set_ylabel('Предсказания модели')
+axes[0, 1].grid(True, linestyle='--', alpha=0.6)
 
-actual_binned = pd.cut(y_test_real, bins=bins, labels=labels)
-pred_binned = pd.cut(y_pred, bins=bins, labels=labels)
+# График 3: Распределение ошибок
+error_train = y_train - y_train_pred
+error_test = y_test - y_test_pred
 
-error_matrix = pd.crosstab(actual_binned, pred_binned,
-                           rownames=['Реальные'],
-                           colnames=['Предсказанные'],
-                           normalize='index')
+axes[1, 0].hist(error_train, bins=30, alpha=0.5, color='blue', label='Ошибки на Train', density=True)
+axes[1, 0].hist(error_test, bins=30, alpha=0.5, color='green', label='Ошибки на Test', density=True)
+axes[1, 0].set_title('3. Распределение ошибок (Реальность минус Прогноз)')
+axes[1, 0].set_xlabel('Ошибка в сумме чека (Факт - Прогноз)')
+axes[1, 0].set_ylabel('Частота')
+axes[1, 0].axvline(0, color='red', linestyle='--', lw=2) # Линия идеального нуля
+axes[1, 0].legend()
+axes[1, 0].grid(True, linestyle='--', alpha=0.6)
 
-plt.figure(figsize=(10, 8))
-sns.heatmap(error_matrix, annot=True, cmap='YlGnBu', fmt='.2f')
-plt.title("Матрица точности по ценовым диапазонам")
-plt.show()
+# График 4 Сравнение
+num_samples = 50
+axes[1, 1].plot(np.arange(num_samples), y_test.values[:num_samples], marker='o', label='Реальный чек', color='green')
+axes[1, 1].plot(np.arange(num_samples), y_test_pred[:num_samples], marker='x', linestyle='--', label='Прогноз', color='red')
+axes[1, 1].set_title(f'4.Cравнение для первых {num_samples} клиентов (Test)')
+axes[1, 1].set_xlabel('Номер клиента')
+axes[1, 1].set_ylabel('Сумма чека')
+axes[1, 1].legend()
+axes[1, 1].grid(True, linestyle='--', alpha=0.6)
 
-regressor = model.named_steps['regressor']
-
-ohe = model.named_steps['preprocessor'].named_transformers_['cat']
-ohe_feature_names = ohe.get_feature_names_out(categorical_features)
-
-all_feature_names = numeric_features + list(ohe_feature_names)
-
-feature_importance_df = pd.DataFrame({
-    'Feature': all_feature_names,
-    'Importance': regressor.feature_importances_
-})
-
-top_features = feature_importance_df.sort_values(by='Importance', ascending=False).head(5)
-
-plt.figure(figsize=(12, 7))
-sns.barplot(x='Importance', y='Feature', data=top_features, palette='viridis')
-plt.title("Топ-5 самых влиятельных признаков в модели")
-plt.xlabel("Степень влияния на прогноз")
-plt.ylabel("Признак")
-plt.grid(axis='x', linestyle='--', alpha=0.7)
 plt.tight_layout()
+plt.subplots_adjust(top=0.9)
 plt.show()
 
-print("\nТоп-5 признаков по важности:")
-print(top_features.head(5))
+# 5. Важность признаков
+model = model_pipeline.named_steps['regressor']
+encoded_cat_cols = model_pipeline.named_steps['preprocessor'].transformers_[1][1].get_feature_names_out(categorical_features)
+all_features = numeric_features + list(encoded_cat_cols)
+
+importances = model.feature_importances_
+feature_imp_df = pd.DataFrame({'Признак': all_features, 'Важность': importances})
+feature_imp_df = feature_imp_df.sort_values(by='Важность', ascending=False).head(5)
+
+print("\nТоп-5 факторов, влияющих на итоговый чек (Sales)")
+print(feature_imp_df.to_string(index=False))
+
+
+plt.figure(figsize=(10,6))
+sns.barplot(x='Важность', y='Признак', data=feature_imp_df)
+plt.title('Важность признаков')
+plt.xlabel('Важность')
+plt.ylabel('Признаки')
+plt.show()
