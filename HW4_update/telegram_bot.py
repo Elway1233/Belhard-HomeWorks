@@ -235,7 +235,6 @@ def handle_message(message):
         response = "Извините, я не понимаю... Воспользуйтесь кнопками."
         bot.send_message(chat_id, response, reply_markup=get_main_menu())
 
-    # Логгер теперь не будет выдавать ошибку UnboundLocalError
     logging.info(
         f"Chat: {chat_id} | "
         f"In: '{text}' | "
