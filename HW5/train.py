@@ -40,7 +40,7 @@ LR_D =   0.000005
 
 opt_E = optim.Adam(enc.parameters(), lr=LR_G_E, betas=(0.5, 0.999))
 opt_G = optim.Adam(gen.parameters(), lr=LR_G_E, betas=(0.5, 0.999))
-opt_D = optim.Adam(disc.parameters(), lr=LR_D, betas=(0.5, 0.999),weight_decay=1e-5)
+opt_D = optim.Adam(disc.parameters(), lr=LR_D, betas=(0.5, 0.999))
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(opt_G, mode='min', factor=0.5, patience=5)
 
