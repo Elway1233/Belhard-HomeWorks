@@ -36,7 +36,7 @@ except Exception as e:
 
 
 LR_G_E = 0.00001
-LR_D =   0.00005
+LR_D =   0.000005
 
 opt_E = optim.Adam(enc.parameters(), lr=LR_G_E, betas=(0.5, 0.999))
 opt_G = optim.Adam(gen.parameters(), lr=LR_G_E, betas=(0.5, 0.999))
@@ -50,7 +50,7 @@ l1_loss = nn.L1Loss()
 print(f"Начинаем обучение на {DEVICE}...")
 print(f"Всего картинок: {len(dataset)}")
 
-START_EPOCH = 140
+START_EPOCH = 0
 EPOCHS = 200
 
 for epoch in range(START_EPOCH, EPOCHS):
